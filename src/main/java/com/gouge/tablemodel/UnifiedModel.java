@@ -1,0 +1,135 @@
+package com.gouge.tablemodel;
+
+/**
+ * Created by Godden
+ * Datetime : 2018/8/7 23:11.
+ */
+
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
+import com.gouge.base.DateHelp;
+import com.gouge.base.HttpUtile;
+import com.gouge.base.JsonResult;
+import com.gouge.param.PageInfo;
+import com.gouge.param.PageParam;
+import com.gouge.param.main.UserRelationAdvancedParam;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
+import javax.swing.table.AbstractTableModel;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.sql.*;
+import java.util.Vector;
+
+public class UnifiedModel extends AbstractTableModel{
+
+    Vector rowData, columnNames;
+
+    PreparedStatement  ps = null;
+    Connection ct = null;
+    ResultSet rs = null;
+
+    private PageInfo pageInfo;
+
+    public UnifiedModel(String url,Class classz,String [] titleArr,String [] fieldArr,String param){
+        columnNames = new Vector<String>();
+        for (String str : titleArr) {
+            columnNames.add(str);
+        }
+
+        rowData = new Vector<Vector<String>>();
+        rowData.removeAll(rowData);
+        try {
+            JsonResult jr  = HttpUtile.sendHttpPost(url, param);
+            setPageInfo(JSONObject.parseObject(JSON.toJSONString(jr.getPage()),PageInfo.class));//设置分页信息
+            JSONArray jsonArray= JSONObject.parseArray(JSON.toJSONString(jr.getData()));
+            if(jsonArray != null && jsonArray.size() > 0){
+                for(int i = 0;i <jsonArray.size();i++){
+                    Vector hang = new Vector<String>();
+                    Object object = JSONObject.parseObject(JSON.toJSONString(jsonArray.get(i)), classz);
+                    Field field = null;
+                    for (String fieldName :fieldArr) {
+                        if(fieldName.equals("crtDate")){
+                            hang.add(DateHelp.sdf.format((Date)getFieldValueByName(fieldName,object)));
+                        }else{
+                            hang.add(getFieldValueByName(fieldName,object));
+                        }
+
+                    }
+                    rowData.add(hang);
+                }
+            }
+        } catch (Exception e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }finally{
+            try {
+                if(rs!=null)rs.close();
+                if(ps!=null) ps.close();
+                if(ct!=null) ct.close();
+            } catch (SQLException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+
+        }
+
+    }
+
+    private Object getFieldValueByName(String fieldName, Object o) {
+        try {
+            String firstLetter = fieldName.substring(0, 1).toUpperCase();
+            String getter = "get" + firstLetter + fieldName.substring(1);
+            Method method = o.getClass().getMethod(getter, new Class[] {});
+            Object value = method.invoke(o, new Object[] {});
+            return value;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+//    public StuModel(){
+//        String s = "select * from stu";
+//        StuModel(s);
+//
+//    }
+
+
+
+    @Override
+    public int getColumnCount() {
+        // TODO Auto-generated method stub
+        return this.columnNames.size();
+    }
+
+    @Override
+    public String getColumnName(int column) {
+        // TODO Auto-generated method stub
+        return (String) this.columnNames.get(column);
+    }
+
+    @Override
+    public int getRowCount() {
+        // TODO Auto-generated method stub
+        return this.rowData.size();
+    }
+
+    @Override
+    public Object getValueAt(int rowIndex, int columnIndex) {
+        // TODO Auto-generated method stub
+        return ((Vector)this.rowData.get(rowIndex)).get(columnIndex);
+    }
+
+    public PageInfo getPageInfo() {
+        return pageInfo;
+    }
+
+    public void setPageInfo(PageInfo pageInfo) {
+        this.pageInfo = pageInfo;
+    }
+
+}
